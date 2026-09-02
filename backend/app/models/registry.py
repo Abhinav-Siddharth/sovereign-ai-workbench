@@ -92,11 +92,17 @@ class ModelRegistry:
 
         if model_type == "local":
             return LocalLLM(
+            model_name=model_name,
+            backend=backend,
+            config=config,
+            )
+        if model_type == "vision":
+            from backend.app.multimodal.vision import MockVisionModel
+            return MockVisionModel(
                 model_name=model_name,
                 backend=backend,
                 config=config,
-            )
-
+                )
         return MockModel(
             model_name=model_name,
             backend=backend,

@@ -1,23 +1,21 @@
-# Sovereign Model Configurations
-# Maps task categories to their designated local model and execution backend
-
 models:
   coding:
-    category: coding
     model_name: granite
     backend: llama.cpp
+    type: mock
 
   vision:
-    category: vision
-    model_name: qwen-vl
+    model_name: qwen2.5-vl-7b
     backend: llama.cpp
+    type: vision
+    quantization: Q4
 
   document:
-    category: document
     model_name: nemotron
     backend: llama.cpp
+    type: mock
 
   general:
-    category: general
     model_name: phi-4-mini
     backend: llama.cpp
+    type: mock

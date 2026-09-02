@@ -48,7 +48,11 @@ class MultimodalPipeline:
             or suffix in self.SUPPORTED_DOCUMENT_TYPES
         )
 
-    def process(self, file_path: str) -> Dict[str, Any]:
+    def process(
+        self,
+        file_path: str,
+        prompt: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Process an image or scanned document."""
 
         self.validate_file(file_path)
@@ -56,8 +60,9 @@ class MultimodalPipeline:
         path = Path(file_path)
 
         processor_type = self.selector.select(
-            file_path
-        )
+            file_path=file_path,
+            prompt=prompt,
+            )
 
         result: Dict[str, Any] = {
             "file": str(path),
@@ -79,12 +84,12 @@ class MultimodalPipeline:
                 else None
             ),
             "status": "ready",
+            "text": None,
         }
 
         if processor_type == "ocr":
             if self.ocr_engine is None:
                 result["status"] = "ocr_unavailable"
-                result["text"] = None
             else:
                 result["text"] = (
                     self.ocr_engine.extract_text(
@@ -95,11 +100,14 @@ class MultimodalPipeline:
         elif processor_type == "vision":
             if self.vision_model is None:
                 result["status"] = "vision_unavailable"
-                result["text"] = None
             else:
+                if prompt is None:
+                    prompt = "Describe this image."
+
                 result["text"] = (
                     self.vision_model.process(
-                        file_path
+                        file_path,
+                        prompt,
                     )
                 )
 
