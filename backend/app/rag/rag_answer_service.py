@@ -3,14 +3,14 @@
 from typing import Any, Dict, List, Optional
 
 from backend.app.models.base import BaseModel
-from backend.app.models.mock import MockModel
+from backend.app.models.local_llm import LocalLLM
 from backend.app.rag.rag_service import RAGService
 
 
 class RAGAnswerService:
     """End-to-end RAG answer service that retrieves context and generates answers.
 
-    Combines semantic search from RAGService with model inference from BaseModel
+    Combines semantic search from RAGService with local inference from LocalLLM (or any BaseModel)
     to produce grounded answers based strictly on stored knowledge.
     """
 
@@ -23,10 +23,14 @@ class RAGAnswerService:
 
         Args:
             rag_service: Optional RAGService instance. Defaults to a new RAGService().
-            model: Optional BaseModel instance. Defaults to MockModel() for offline testing.
+            model: Optional BaseModel instance. Defaults to LocalLLM(model_name="llama3.2:latest").
         """
         self.rag_service = rag_service if rag_service is not None else RAGService()
-        self.model = model if model is not None else MockModel()
+        self.model = (
+            model
+            if model is not None
+            else LocalLLM(model_name="llama3.2:latest")
+        )
 
     def answer(self, query: str, n_results: int = 3) -> Dict[str, Any]:
         """Retrieve relevant context chunks and generate a grounded answer to the query.
