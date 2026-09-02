@@ -12,6 +12,7 @@ except ImportError:  # pragma: no cover
     yaml = None  # type: ignore
 
 from backend.app.models.base import BaseModel
+from backend.app.models.local_llm import LocalLLM
 from backend.app.models.mock import MockModel
 
 # Default path to the models configuration file
@@ -80,13 +81,25 @@ class ModelRegistry:
     def get_model(self, category: str) -> BaseModel:
         """Return a model instance for the given task category.
 
-        For Milestone 3, returns a MockModel initialized with the configured
-        model name and backend.
+        Reads the 'type' field from the configuration:
+        - If 'local': returns a LocalLLM.
+        - If 'mock' or missing: returns a MockModel.
         """
         config = self.get_config(category)
+        model_type = config.get("type", "mock")
+        model_name = config.get("model_name", "unknown-model")
+        backend = config.get("backend", "llama.cpp")
+
+        if model_type == "local":
+            return LocalLLM(
+                model_name=model_name,
+                backend=backend,
+                config=config,
+            )
+
         return MockModel(
-            model_name=config.get("model_name", "unknown-model"),
-            backend=config.get("backend", "llama.cpp"),
+            model_name=model_name,
+            backend=backend,
             config=config,
         )
 

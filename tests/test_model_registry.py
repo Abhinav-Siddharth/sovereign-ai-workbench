@@ -9,6 +9,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from backend.app.models.base import BaseModel
+from backend.app.models.local_llm import LocalLLM
 from backend.app.models.mock import MockModel
 from backend.app.models.registry import (
     ModelRegistry,
@@ -23,6 +24,7 @@ def test_load_model_configs():
     configs = load_model_configs()
     assert isinstance(configs, dict)
     assert "coding" in configs
+
     assert "vision" in configs
     assert "document" in configs
     assert "general" in configs
@@ -94,3 +96,15 @@ def test_fallback_category():
     config = get_model_config("unrecognized_category")
     assert config["model_name"] == "phi-4-mini"
     assert config["backend"] == "llama.cpp"
+
+
+def test_local_llm_structure():
+    """Verify LocalLLM attributes and BaseModel inheritance without invoking runtime."""
+    llm = LocalLLM(model_name="granite", backend="llama.cpp", config={"temperature": 0.2})
+    assert isinstance(llm, BaseModel)
+    assert llm.model_name == "granite"
+    assert llm.backend == "llama.cpp"
+    assert llm.config == {"temperature": 0.2}
+
+
+
