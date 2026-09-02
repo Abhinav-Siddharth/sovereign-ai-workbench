@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from backend.app.multimodal.processor_selector import ProcessorSelector
+
 
 class MultimodalPipeline:
     """Process images and scanned documents."""
@@ -27,6 +29,7 @@ class MultimodalPipeline:
 
         self.vision_model = vision_model
         self.ocr_engine = ocr_engine
+        self.selector = ProcessorSelector()
 
     def validate_file(self, file_path: str) -> bool:
         """Check whether the file type is supported."""
@@ -51,16 +54,20 @@ class MultimodalPipeline:
         self.validate_file(file_path)
 
         path = Path(file_path)
-        suffix = path.suffix.lower()
 
-        if suffix in self.SUPPORTED_IMAGE_TYPES:
-            input_type = "image"
-        else:
-            input_type = "document"
+        processor_type = self.selector.select(
+            file_path
+        )
 
         result: Dict[str, Any] = {
             "file": str(path),
-            "type": input_type,
+            "type": (
+                "image"
+                if path.suffix.lower()
+                in self.SUPPORTED_IMAGE_TYPES
+                else "document"
+            ),
+            "processor": processor_type,
             "vision_model": (
                 type(self.vision_model).__name__
                 if self.vision_model
@@ -74,12 +81,26 @@ class MultimodalPipeline:
             "status": "ready",
         }
 
-        # Run OCR when an OCR engine is available.
-        if self.ocr_engine is not None:
-            result["text"] = self.ocr_engine.extract_text(
-                file_path
-            )
-        else:
-            result["text"] = None
+        if processor_type == "ocr":
+            if self.ocr_engine is None:
+                result["status"] = "ocr_unavailable"
+                result["text"] = None
+            else:
+                result["text"] = (
+                    self.ocr_engine.extract_text(
+                        file_path
+                    )
+                )
+
+        elif processor_type == "vision":
+            if self.vision_model is None:
+                result["status"] = "vision_unavailable"
+                result["text"] = None
+            else:
+                result["text"] = (
+                    self.vision_model.process(
+                        file_path
+                    )
+                )
 
         return result
