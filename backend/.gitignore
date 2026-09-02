@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 
 # Virtual Environments
@@ -12,6 +13,9 @@ env/
 # Environment Variables & Secrets
 .env
 *.env
+
+# Data & Vector Storage
+data/chroma/
 
 # Testing and Coverage
 .pytest_cache/
