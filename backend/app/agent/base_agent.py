@@ -1,18 +1,20 @@
-"""Agent with planning, tool use, observation, and critique."""
+"""Agent with planning, tool use, answer generation, and critique."""
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from backend.app.models.base import BaseModel
 from backend.app.agent.tools import RAGSearchTool
+from backend.app.agent.answer_generator import AnswerGenerator
 
 
 class Agent:
-    """Sovereign agent that can plan and use local tools."""
+    """Sovereign agent that can plan, use tools, and generate answers."""
 
     def __init__(self, model: BaseModel) -> None:
         """Initialize the agent."""
         self.model = model
         self.rag_tool = RAGSearchTool()
+        self.answer_generator = AnswerGenerator(model)
 
     def plan(self, task: str) -> str:
         """Create a plan for the task."""
@@ -28,9 +30,8 @@ class Agent:
         return self.model.generate(prompt)
 
     def act(self, task: str, plan: str) -> Dict[str, Any]:
-        """Execute the plan using available tools."""
+        """Execute the plan using the RAG tool."""
 
-        # Search the local knowledge base for relevant information.
         rag_result = self.rag_tool.run(
             query=task,
             n_results=3,
@@ -43,13 +44,38 @@ class Agent:
             "plan": plan,
         }
 
-    def observe(self, result: Dict[str, Any]) -> str:
-        """Observe and summarize the tool execution result."""
+    def generate_answer(
+        self,
+        task: str,
+        execution: Dict[str, Any],
+    ) -> str:
+        """Generate a final answer from retrieved documents."""
+
+        raw_documents = execution["tool_result"].get(
+            "documents",
+            [],
+        )
+
+        if raw_documents and isinstance(raw_documents[0], list):
+            documents: List[str] = raw_documents[0]
+        else:
+            documents = raw_documents
+
+        return self.answer_generator.generate(
+            question=task,
+            documents=documents,
+        )
+
+    def observe(
+        self,
+        result: Dict[str, Any],
+    ) -> str:
+        """Observe the tool execution result."""
 
         prompt = (
             "You are an AI observer.\n"
-            "Inspect the following tool execution result and "
-            "describe what was found.\n\n"
+            "Inspect the following tool execution result "
+            "and describe what was found.\n\n"
             f"Tool execution result:\n{result}\n\n"
             "Observations:"
         )
@@ -77,31 +103,37 @@ class Agent:
     def run(self, task: str) -> Dict[str, Any]:
         """Run the complete agent workflow."""
 
-        # 1. Plan
+        # 1. Create a plan
         plan_output = self.plan(task)
 
-        # 2. Act using a real tool
+        # 2. Execute the plan using a real tool
         execution_output = self.act(
             task=task,
             plan=plan_output,
         )
 
-        # 3. Observe the result
+        # 3. Generate the final answer from retrieved documents
+        answer_output = self.generate_answer(
+            task=task,
+            execution=execution_output,
+        )
+
+        # 4. Observe the execution
         observation_output = self.observe(
             execution_output
         )
 
-        # 4. Critique the result
+        # 5. Critique the result
         critique_output = self.critique(
             task=task,
             result=execution_output,
         )
 
-        # Return the complete agent trace.
         return {
             "task": task,
             "plan": plan_output,
             "execution": execution_output,
+            "answer": answer_output,
             "observation": observation_output,
             "critique": critique_output,
         }
