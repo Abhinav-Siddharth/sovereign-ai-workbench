@@ -47,7 +47,10 @@ class MockVisionModel(VisionModel):
 
     def generate(self, prompt: str) -> str:
         """Provide BaseModel-compatible generation for testing."""
-        return f"[Mock Vision] Generated response for: {prompt}"
+        return (
+            f"[{self.model_name} via {self.backend}] "
+            f"Generated response for: {prompt}"
+            )
 
 
 class QwenVisionModel(VisionModel):
