@@ -44,3 +44,8 @@ class ModelOrchestrator:
             "result": result,
             **selection,
         }
+
+    def get_active_model(self):
+        """Return the currently active model."""
+
+        return self.manager.get_active_model()
