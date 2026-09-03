@@ -1,7 +1,11 @@
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
 from backend.app.model_ops.model_manager import ModelManager
 from backend.app.model_ops.model_selector import ModelSelector
 from backend.app.model_ops.model_orchestrator import ModelOrchestrator
 from backend.app.services.task_service import TaskService, process_task
+from backend.app.multimodal.pipeline import MultimodalPipeline
 
 
 class FakeVRAMMonitor:
@@ -199,3 +203,143 @@ def test_process_task_function():
     """
     # We only verify that the function exists and has the expected API.
     assert callable(process_task)
+
+class FakeOCR:
+    """Fake OCR engine for testing."""
+
+    def extract_text(self, image_path):
+        return "Safety inspection every 30 days."
+
+
+class FakeVision:
+    """Fake vision model for testing."""
+
+    def process(self, image_path, prompt=None):
+        return f"Vision result for {Path(image_path).name}: {prompt}"
+
+
+def create_multimodal_task_service(free_vram=7000):
+    """Create a TaskService with fake model and multimodal components."""
+
+    vram = FakeVRAMMonitor(free_vram)
+    ollama = FakeOllamaController()
+    registry = FakeRegistry()
+
+    manager = ModelManager(
+        vram_monitor=vram,
+        ollama_controller=ollama,
+        model_registry=registry,
+    )
+
+    selector = ModelSelector(
+        registry=registry,
+        vram_monitor=vram,
+    )
+
+    orchestrator = ModelOrchestrator(
+        selector=selector,
+        manager=manager,
+    )
+
+    manager.register_model(
+        "granite",
+        FakeModel("granite"),
+    )
+
+    manager.register_model(
+        "qwen-vl",
+        FakeModel("qwen-vl"),
+    )
+
+    manager.register_model(
+        "nemotron",
+        FakeModel("nemotron"),
+    )
+
+    manager.register_model(
+        "phi-4-mini",
+        FakeModel("phi-4-mini"),
+    )
+
+    pipeline = MultimodalPipeline(
+        vision_model=FakeVision(),
+        ocr_engine=FakeOCR(),
+    )
+
+    return TaskService(
+        orchestrator=orchestrator,
+        multimodal_pipeline=pipeline,
+    )
+
+def test_task_service_with_ocr_file():
+    """Verify that an attached image is processed through OCR."""
+
+    service = create_multimodal_task_service()
+
+    with NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+        temp_path = temp_file.name
+
+    try:
+        result = service.execute(
+            "Extract text from this image.",
+            file_path=temp_path,
+        )
+
+        assert result["category"] == "vision"
+        assert result["model_name"] == "qwen-vl"
+
+        assert "multimodal" in result
+        assert result["multimodal"]["processor"] == "ocr"
+
+        assert (
+            result["multimodal"]["text"]
+            == "Safety inspection every 30 days."
+        )
+
+        assert "Safety inspection every 30 days." in result["response"]
+
+    finally:
+        Path(temp_path).unlink(missing_ok=True)
+
+
+def test_task_service_with_vision_file():
+    """Verify that an attached image can be processed by vision."""
+
+    service = create_multimodal_task_service()
+
+    with NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+        temp_path = temp_file.name
+
+    try:
+        result = service.execute(
+            "Analyze the image.",
+            file_path=temp_path,
+        )
+
+        assert result["category"] == "vision"
+        assert result["model_name"] == "qwen-vl"
+
+        assert "multimodal" in result
+        assert result["multimodal"]["processor"] == "vision"
+
+        assert "Vision result" in result["multimodal"]["text"]
+
+        assert "Vision result" in result["response"]
+
+    finally:
+        Path(temp_path).unlink(missing_ok=True)
+
+
+def test_task_service_without_file():
+    """Verify that text-only requests still work."""
+
+    service = create_multimodal_task_service()
+
+    result = service.execute(
+        "Write a Python function to calculate factorial."
+    )
+
+    assert result["category"] == "coding"
+    assert result["model_name"] == "granite"
+
+    assert "multimodal" not in result
